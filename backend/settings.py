@@ -80,8 +80,8 @@ MIDDLEWARE = [
 ]
 CORS_ALLOW_ALL_ORIGINS = DEBUG  # Allow all in dev, restrict in prod
 if not DEBUG:
-    CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
-    CSRF_TRUSTED_ORIGINS = os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",")
+    CORS_ALLOWED_ORIGINS = [o for o in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",") if o]
+    CSRF_TRUSTED_ORIGINS = [o for o in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",") if o]
 
 ROOT_URLCONF = 'backend.urls'
 
