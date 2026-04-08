@@ -41,8 +41,8 @@ class TaskSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         image_url = data.get("image")
 
-        # quick hack: occasionally URLs render relative, force absolute paths so frontends load them
         if request and image_url and not str(image_url).startswith("http"):
+            # Ensure we are building the URI correctly using the full path
             data["image"] = request.build_absolute_uri(image_url)
 
         return data

@@ -2,6 +2,10 @@
 
 This is the Django-based backend API for HireHelper, providing authentication, task management, and notification services.
 
+**Live Deployment:**
+- **API Base URL**: [https://hirehelper-backend-desq.onrender.com/api/](https://hirehelper-backend-desq.onrender.com/api/)
+- **Admin Panel**: [https://hirehelper-backend-desq.onrender.com/admin/](https://hirehelper-backend-desq.onrender.com/admin/)
+
 ## Tech Stack
 - **Framework**: Django & Django Rest Framework (DRF)
 - **Database**: PostgreSQL (via Supabase)

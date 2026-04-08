@@ -23,6 +23,16 @@ class UserSerializer(serializers.ModelSerializer):
             "is_verified"
         ]
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        request = self.context.get("request")
+        profile_picture = data.get("profile_picture")
+
+        if request and profile_picture and not str(profile_picture).startswith("http"):
+            data["profile_picture"] = request.build_absolute_uri(profile_picture)
+
+        return data
+
 
 class RegisterSerializer(serializers.ModelSerializer):
 
