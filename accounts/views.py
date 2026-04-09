@@ -25,7 +25,11 @@ def _normalize_username(username_str: str) -> str:
 import threading
 
 def _send_otp_email(subject: str, message: str, recipient_email: str):
-    """Send OTP email in a background thread to prevent UI lag."""
+    """
+    Attempts to send an OTP email.
+    In DEBUG mode, it sends synchronously to catch errors immediately.
+    In production/non-DEBUG, it uses a thread to avoid blocking.
+    """
     def send():
         try:
             send_mail(
@@ -33,14 +37,21 @@ def _send_otp_email(subject: str, message: str, recipient_email: str):
                 message,
                 settings.DEFAULT_FROM_EMAIL,
                 [recipient_email],
-                fail_silently=True,
+                fail_silently=False,
             )
-        except Exception:
-            pass
+            return True, None
+        except Exception as e:
+            print(f"EMAIL ERROR: {str(e)}")
+            return False, str(e)
 
-    thread = threading.Thread(target=send)
-    thread.start()
-    return True, None
+    if settings.DEBUG:
+        # Synchronous in debug for immediate feedback
+        return send()
+    else:
+        # Background thread in production
+        thread = threading.Thread(target=send)
+        thread.start()
+        return True, None  # Assume success for UX, or use a proper task queue (Celery)
 
 
 @api_view(['POST'])
@@ -71,11 +82,11 @@ def register_user(request):
         if sent:
             return Response({"message": "User registered. OTP sent to email."})
 
-        # Fallback for debug mode
+        # Fallback for debug mode or email failure
         if settings.DEBUG:
             return Response(
                 {
-                    "message": "User registered, but email failed. Use the OTP below.",
+                    "message": "User registered, but email failed. Use the OTP below to verify.",
                     "otp": otp_code,
                     "email_error": error_msg,
                 },
@@ -83,7 +94,7 @@ def register_user(request):
             )
 
         return Response(
-            {"error": "User registered, but OTP email failed. Please resend OTP."},
+            {"error": "User registered, but OTP email failed. Please try to resend OTP later."},
             status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
 
@@ -99,7 +110,7 @@ def verify_otp(request):
     try:
         user = User.objects.get(email__iexact=email)
 
-        if user.otp == otp_code and user.otp_expiry > timezone.now():
+        if user.otp == otp_code and (not user.otp_expiry or user.otp_expiry > timezone.now()):
             user.is_verified = True
             user.save()
             return Response({"message": "OTP verified successfully"})
@@ -144,14 +155,14 @@ def resend_otp(request):
     if settings.DEBUG:
         return Response(
             {
-                "message": "Batch delivery failed. Use the OTP below.",
+                "message": "Email delivery failed. Use the OTP below.",
                 "otp": otp_code,
                 "email_error": error_msg,
             },
             status=status.HTTP_201_CREATED,
         )
 
-    return Response({"error": "Failed to send OTP email"}, status=503)
+    return Response({"error": "Failed to send OTP email"}, status= status.HTTP_503_SERVICE_UNAVAILABLE)
 
 
 @api_view(['POST'])
@@ -175,7 +186,15 @@ def login_user(request):
         return Response({"error": "Account not verified"}, status=403)
 
     refresh = RefreshToken.for_user(user)
-    profile_pic = request.build_absolute_uri(user.profile_picture.url) if user.profile_picture else ""
+    
+    # Securely build profile picture URL
+    profile_pic = ""
+    if user.profile_picture:
+        url = user.profile_picture.url
+        if url.startswith("http"):
+            profile_pic = url
+        else:
+            profile_pic = request.build_absolute_uri(url)
 
     return Response({
         'token': str(refresh.access_token),
