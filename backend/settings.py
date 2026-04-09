@@ -198,8 +198,8 @@ CLOUDINARY_STORAGE = {
     'API_SECRET': os.getenv('CLOUDINARY_API_SECRET'),
 }
 
-# Use Cloudinary for media files if credentials are provided
-if CLOUDINARY_STORAGE['CLOUD_NAME']:
+# Use Cloudinary for media files if credentials are provided and not placeholders
+if CLOUDINARY_STORAGE['CLOUD_NAME'] and CLOUDINARY_STORAGE['CLOUD_NAME'] not in ['your_cloud_name', '']:
     DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 else:
     DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
