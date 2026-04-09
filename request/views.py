@@ -11,19 +11,26 @@ from tasks.models import Task
 from notifications.models import Notification
 
 
+import threading
+
 def _send_request_email(subject: str, message: str, recipient_email: str):
-    """Utility to send task-related emails with basic error handling."""
-    try:
-        send_mail(
-            subject,
-            message,
-            settings.DEFAULT_FROM_EMAIL,
-            [recipient_email],
-            fail_silently=False,
-        )
-        return True, None
-    except Exception as e:
-        return False, str(e)
+    """Utility to send task-related emails in a background thread."""
+    def send():
+        try:
+            send_mail(
+                subject,
+                message,
+                settings.DEFAULT_FROM_EMAIL,
+                [recipient_email],
+                fail_silently=True, # Prevent app crash if SMTP fails
+            )
+        except Exception:
+            pass # Background failure should not affect user
+
+    # Fire and forget
+    thread = threading.Thread(target=send)
+    thread.start()
+    return True, None
 
 
 @api_view(['POST'])
@@ -84,7 +91,8 @@ def send_request(request):
 @permission_classes([IsAuthenticated])
 def my_requests(request):
     """List requests sent by the authenticated helper."""
-    requests = TaskRequest.objects.filter(requester=request.user).select_related("task").order_by("-created_at")
+    # select_related("task", "task__created_by") fixes N+1 for task details and hirer info
+    requests = TaskRequest.objects.filter(requester=request.user).select_related("task", "task__created_by").order_by("-created_at")
     serializer = TaskRequestSerializer(requests, many=True)
     return Response(serializer.data)
 
@@ -177,6 +185,7 @@ def reject_request(request, request_id):
 @permission_classes([IsAuthenticated])
 def received_requests(request):
     """List all requests received by the hirer for their tasks."""
+    # select_related("task", "requester") fixes N+1 for task details and helper info
     requests = TaskRequest.objects.filter(task__created_by=request.user).select_related("task", "requester").order_by("-created_at")
     serializer = TaskRequestSerializer(requests, many=True)
     return Response(serializer.data)

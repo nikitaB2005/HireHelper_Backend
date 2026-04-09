@@ -22,19 +22,25 @@ def _normalize_username(username_str: str) -> str:
     return (username_str or "").strip()
 
 
+import threading
+
 def _send_otp_email(subject: str, message: str, recipient_email: str):
-    """Send OTP email with basic error handling."""
-    try:
-        send_mail(
-            subject,
-            message,
-            settings.DEFAULT_FROM_EMAIL,
-            [recipient_email],
-            fail_silently=False,
-        )
-        return True, None
-    except Exception as e:
-        return False, str(e)
+    """Send OTP email in a background thread to prevent UI lag."""
+    def send():
+        try:
+            send_mail(
+                subject,
+                message,
+                settings.DEFAULT_FROM_EMAIL,
+                [recipient_email],
+                fail_silently=True,
+            )
+        except Exception:
+            pass
+
+    thread = threading.Thread(target=send)
+    thread.start()
+    return True, None
 
 
 @api_view(['POST'])

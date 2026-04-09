@@ -24,16 +24,30 @@ def create_task(request):
 @permission_classes([IsAuthenticated])
 def task_feed(request):
     """Fetch all open tasks for the global feed, excluding our own."""
-    tasks = Task.objects.filter(status="open").exclude(created_by=request.user)
-    serializer = TaskSerializer(tasks, many=True, context={"request": request})
-    return Response(serializer.data)
+    # Use select_related to fetch created_by details in a single query (Fix N+1)
+    tasks = Task.objects.filter(status="open").exclude(created_by=request.user).select_related('created_by').order_by('-created_at')
+    
+    # Simple pagination (can be replaced with standard DRF pagination class if preferred)
+    page = int(request.query_params.get('page', 1))
+    page_size = 20
+    start = (page - 1) * page_size
+    end = start + page_size
+    
+    serializer = TaskSerializer(tasks[start:end], many=True, context={"request": request})
+    return Response({
+        "results": serializer.data,
+        "count": tasks.count(),
+        "page": page,
+        "has_more": tasks.count() > end
+    })
 
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def my_tasks(request):
     """Fetch tasks created by the authenticated user."""
-    tasks = Task.objects.filter(created_by=request.user)
+    # select_related avoids repeated user table lookups
+    tasks = Task.objects.filter(created_by=request.user).select_related('created_by').order_by('-created_at')
     serializer = TaskSerializer(tasks, many=True, context={"request": request})
     return Response(serializer.data)
 
